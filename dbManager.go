@@ -32,7 +32,6 @@ type ConfigMongoDB struct {
 
 type DBType interface {
 	*sql.DB
-	//| *mongo.Database
 }
 
 type DBManager[T DBType] interface {
@@ -54,31 +53,15 @@ func (db *DB[T]) Close() {
 	switch db := any(db.DB).(type) {
 	case *sql.DB:
 		db.Close()
-		//case *mongo.Database:
-		//	db.Client().Disconnect(context.TODO())
 	}
 }
 
-// InitDB - Init relationship database.
-// support driver type: oracle,mysql(mariadb),postgres, sqlite3
-// import go database driver at main package with underscore (_)
-// ex:
-// mysql:	import _ "github.com/go-sql-driver/mysql"
-// posgres: import _ "github.com/lib/pq"
-// oracle:  import _ "github.com/sijms/go-ora/v2"
-// sqlite3: import _ "github.com/mattn/go-sqlite3"
-// With sqlite3: ConfigDBSQL.ConnectionString is file path for .db
 func InitDB[T *sql.DB](cfg ConfigDBSQL) (DBManager[T], error) {
 	logx.Info(fmt.Sprintf("Connecting to %s:%d, use driver: %s", cfg.IP, cfg.Port, cfg.Driver))
 	var connStr, queryVersion string
-	// switch driver config
+
 	switch cfg.Driver {
 	case "oracle":
-		//connStr = fmt.Sprintf("oracle://%s:%s@%s:%d/%s", cfg.UserName, cfg.Password,
-		//	cfg.IP, cfg.Port, cfg.DefaultSchema)
-		//if val, ok := cfg.Options["walletLocation"]; ok && val != "" {
-		//	connStr += "?TRACE FILE=trace.logger&SSL=enable&SSL Verify=false&WALLET=" + url.QueryEscape(val)
-		//}
 		connStr = go_ora.BuildJDBC(cfg.UserName, cfg.Password, cfg.ConnectionString, cfg.Options)
 		queryVersion = "SELECT Banner FROM v$version"
 		break
@@ -111,7 +94,7 @@ func InitDB[T *sql.DB](cfg ConfigDBSQL) (DBManager[T], error) {
 	conn.SetConnMaxLifetime(time.Duration(cfg.MaxLifeTime) * time.Second)
 	conn.SetMaxIdleConns(cfg.MaxIdle)
 	conn.SetMaxOpenConns(cfg.MaxOpen)
-	// Test connection by select version query
+
 	var version string
 	if err := conn.QueryRow(queryVersion).Scan(&version); err != nil {
 		logx.Error(err)
@@ -120,19 +103,5 @@ func InitDB[T *sql.DB](cfg ConfigDBSQL) (DBManager[T], error) {
 	logx.Info(fmt.Sprintf("Connected! Use driver %s. Database version: %s", cfg.Driver, version))
 	return &DB[T]{
 		DB: conn,
-	}, nil
-}
-
-InitMongoDB - Init MongoDB database connection
-func InitMongoDB[T *mongo.Database](ctx context.Context, config ConfigMongoDB) (DBManager[T], error) {
-	logx.Info(fmt.Sprintf("Connecting to MongoDB: %s ", config.Database))
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(config.URI))
-	if err != nil {
-		logx.Error(err)
-		return nil, err
-	}
-	logx.Info("Connected to MongoDB")
-	return &DB[T]{
-		DB: client.Database(config.Database),
 	}, nil
 }
