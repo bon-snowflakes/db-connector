@@ -1,4 +1,4 @@
-module db-connector
+module github.com/bon-snowflakes/db-connector
 
 go 1.19
 
